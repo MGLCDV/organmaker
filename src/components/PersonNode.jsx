@@ -67,7 +67,7 @@ const PersonNode = ({ id, data }) => {
 
   return (
     <div
-      className="person-node group relative rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-200 w-56 select-none border-2"
+      className="person-node group relative rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-200 w-64 select-none border-2"
       style={{ backgroundColor: bgColor, borderColor }}
     >
       {/* Handle cible (haut) */}
@@ -136,9 +136,9 @@ const PersonNode = ({ id, data }) => {
       </div>
 
       {/* Photo */}
-      <div className="flex justify-center pt-4">
+      <div className="flex justify-center pt-5">
         <div
-          className="w-16 h-16 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center transition-colors"
+          className="w-24 h-24 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center transition-colors"
           style={{ borderColor, backgroundColor: bgColor === '#ffffff' ? '#eef2ff' : bgColor }}
           onClick={() => fileInputRef.current?.click()}
           title="Cliquer pour changer la photo"
@@ -151,7 +151,7 @@ const PersonNode = ({ id, data }) => {
             />
           ) : (
             <svg
-              className="w-8 h-8 text-indigo-300"
+              className="w-12 h-12 text-indigo-300"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

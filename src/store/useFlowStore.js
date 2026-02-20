@@ -19,6 +19,14 @@ const useFlowStore = create((set, get) => ({
   // ─── State ────────────────────────────────────────────
   nodes: [],
   edges: [],
+  fileName: 'Mon Organigramme',
+  fileVersion: 1,
+
+  // ─── Actions ──────────────────────────────────────────
+  setFileName: (fileName) => {
+    set({ fileName });
+    get().saveFlow();
+  },
 
   // ─── React Flow callbacks ─────────────────────────────
   onNodesChange: (changes) => {
@@ -147,9 +155,9 @@ const useFlowStore = create((set, get) => ({
 
   /** Sauvegarder l'état dans localStorage */
   saveFlow: () => {
-    const { nodes, edges } = get();
+    const { nodes, edges, fileName, fileVersion } = get();
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges, fileName, fileVersion }));
     } catch {
       // Quota dépassé – silencieux
     }
@@ -160,8 +168,13 @@ const useFlowStore = create((set, get) => ({
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const { nodes, edges } = JSON.parse(raw);
-        set({ nodes: nodes || [], edges: edges || [] });
+        const { nodes, edges, fileName, fileVersion } = JSON.parse(raw);
+        set({
+          nodes: nodes || [],
+          edges: edges || [],
+          fileName: fileName || 'Mon Organigramme',
+          fileVersion: fileVersion || 1,
+        });
       }
     } catch {
       // JSON invalide – on repart à vide
@@ -172,11 +185,12 @@ const useFlowStore = create((set, get) => ({
 
   /** Exporter l'état en fichier JSON */
   exportFlow: () => {
-    const { nodes, edges } = get();
+    const { nodes, edges, fileName, fileVersion } = get();
     const payload = {
       meta: {
         app: 'OrganMaker',
-        version: '1.0',
+        version: String(fileVersion),
+        fileName,
         exportedAt: new Date().toISOString(),
       },
       nodes,
@@ -187,11 +201,18 @@ const useFlowStore = create((set, get) => ({
     });
     const url = URL.createObjectURL(blob);
     const date = new Date().toISOString().slice(0, 10);
+    const safeName = fileName
+      .replace(/[^a-zA-Z0-9\u00C0-\u017F\-_]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
     const a = document.createElement('a');
     a.href = url;
-    a.download = `organigramme-${date}.json`;
+    a.download = `${safeName || 'organigramme'}_v${fileVersion}_${date}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    // Incrémenter la version pour le prochain export
+    set({ fileVersion: fileVersion + 1 });
+    get().saveFlow();
   },
 
   /** Importer un fichier JSON et remplacer l'état */
@@ -218,7 +239,13 @@ const useFlowStore = create((set, get) => ({
             )
           )
             return;
-          set({ nodes, edges });
+          const meta = data.meta || {};
+          set({
+            nodes,
+            edges,
+            fileName: meta.fileName || 'Mon Organigramme',
+            fileVersion: parseInt(meta.version, 10) || 1,
+          });
           get().saveFlow();
         } catch {
           alert('Impossible de lire le fichier JSON.');
@@ -231,7 +258,7 @@ const useFlowStore = create((set, get) => ({
 
   /** Tout réinitialiser */
   resetFlow: () => {
-    set({ nodes: [], edges: [] });
+    set({ nodes: [], edges: [], fileName: 'Mon Organigramme', fileVersion: 1 });
     localStorage.removeItem(STORAGE_KEY);
   },
 }));
