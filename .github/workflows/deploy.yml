@@ -1,0 +1,65 @@
+# Déploiement automatique sur GitHub Pages à chaque push sur main
+name: Deploy to GitHub Pages
+
+on:
+  # Se déclenche à chaque push sur la branche main
+  push:
+    branches: ['main']
+  # Permet aussi de lancer le déploiement manuellement depuis l'onglet Actions
+  workflow_dispatch:
+
+# Permissions nécessaires pour déployer sur GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Empêche les déploiements simultanés
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Récupère le code du repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Installe Node.js
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # Installe les dépendances
+      - name: Install dependencies
+        run: npm ci
+
+      # Build le projet (npm run build = vite build)
+      - name: Build
+        run: npm run build
+
+      # Prépare les fichiers pour GitHub Pages
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # Upload le dossier dist comme artifact
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Déploie l'artifact sur GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
