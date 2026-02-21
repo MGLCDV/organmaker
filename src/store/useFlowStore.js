@@ -19,10 +19,10 @@ let _preDragSnapshot = null;
 let _editSnapshot = null;
 let _editTimer = null;
 
-/** Strip volatile (visual-only) properties so undo ignores them */
+/** Strip volatile / React Flow internal properties so undo ignores them */
 function _partialize({ nodes, edges }) {
   return {
-    nodes: nodes.map(({ selected, dragging, ...rest }) => rest),
+    nodes: nodes.map(({ selected, dragging, width, height, positionAbsolute, measured, resizing, handleBounds, ...rest }) => rest),
     edges: edges.map(({ selected, ...rest }) => rest),
   };
 }
@@ -121,7 +121,7 @@ const useFlowStore = create(
           id: uuidv4(),
           type: 'person',
           position,
-          zIndex: 1000,
+          zIndex: 10,
           data: {
             name: 'Nouveau',
             role: 'Rôle',
@@ -146,7 +146,7 @@ const useFlowStore = create(
             color: '#e0e7ff',
           },
           style: { width: 500, height: 350 },
-          zIndex: 0,
+          zIndex: -10,
         };
         set({ nodes: [...get().nodes, node] });
         get()._save();

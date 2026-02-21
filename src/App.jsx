@@ -13,7 +13,9 @@ import PersonNode from './components/PersonNode';
 import SectionNode from './components/SectionNode';
 import CustomEdge from './components/CustomEdge';
 import Sidebar from './components/Sidebar';
+import ShortcutsHelp from './components/ShortcutsHelp';
 import useFlowStore from './store/useFlowStore';
+import useKeyboardShortcuts from './hooks/useKeyboardShortcuts';
 
 // ─── Types de nodes et edges personnalisés ──────────────
 const nodeTypes = { person: PersonNode, section: SectionNode };
@@ -107,35 +109,8 @@ function Flow() {
     loadFlow();
   }, [loadFlow]);
 
-  // ── Keyboard shortcuts ─────────────────────────────
-  useEffect(() => {
-    const handler = (e) => {
-      const tag = e.target.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-
-      const ctrl = e.ctrlKey || e.metaKey;
-
-      if (ctrl && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      }
-      if (ctrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-        e.preventDefault();
-        handleRedo();
-      }
-      if (ctrl && e.key === 'c') {
-        e.preventDefault();
-        useFlowStore.getState().copySelected();
-      }
-      if (ctrl && e.key === 'v') {
-        e.preventDefault();
-        useFlowStore.getState().pasteClipboard();
-      }
-    };
-
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo]);
+  // ── Keyboard shortcuts (voir src/hooks/useKeyboardShortcuts.js) ──
+  useKeyboardShortcuts();
 
   // ── Export PNG ─────────────────────────────────────
   const handleExportPng = useCallback(() => {
@@ -303,7 +278,7 @@ function Flow() {
           {/* Reset */}
           <button
             onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-transparent text-red-600 hover:bg-red-50 border border-red-600 transition-colors"
             title="Réinitialiser"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -318,6 +293,7 @@ function Flow() {
       <div className="flex-1 relative" ref={reactFlowWrapper}>
         {/* Floating sidebar */}
         <Sidebar />
+        <ShortcutsHelp />
 
         <ReactFlow
           nodes={nodes}
@@ -348,6 +324,7 @@ function Flow() {
           <Controls
             className="!bg-white !border !border-gray-200 !rounded-xl !shadow-md"
             showInteractive={false}
+            position="bottom-right"
           />
           <MiniMap
             nodeColor={(node) => {

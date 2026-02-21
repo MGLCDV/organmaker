@@ -91,8 +91,19 @@ html, body, #root {
 .react-flow__minimap {
   border-radius: 12px !important;
 }
+
+/* Controls : placés à gauche de la minimap, en bas à droite */
 .react-flow__controls {
   border-radius: 12px !important;
+}
+.react-flow__controls.bottom.right {
+  bottom: 14px;
+  right: 220px;
+}
+/* Minimap dans le coin bas-droite */
+.react-flow__minimap.bottom.right {
+  bottom: 14px;
+  right: 14px;
 }
 .react-flow__controls button {
   border-radius: 8px !important;
@@ -108,4 +119,25 @@ html, body, #root {
 ::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
   border-radius: 3px;
+}
+
+/* ─── Modal d'aide raccourcis (animation) ────────────── */
+.animate-in {
+  animation: modalIn 0.2s ease-out;
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Masquer le bouton raccourcis lors de l'export PNG */
+.exporting .shortcuts-help-btn {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
