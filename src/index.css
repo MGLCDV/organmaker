@@ -64,9 +64,16 @@ html, body, #root {
 .exporting .react-flow__resize-control,
 .exporting .react-flow__minimap,
 .exporting .react-flow__controls,
-.exporting .react-flow__node .color-picker-wrapper button {
+.exporting .react-flow__node .color-picker-wrapper button,
+.exporting .add-toolbar,
+.exporting .sidebar {
   opacity: 0 !important;
   pointer-events: none !important;
+}
+
+/* ─── Sidebar transitions ────────────────────────────── */
+.sidebar {
+  transition: width 0.2s ease-in-out;
 }
 
 /* ─── Edge animation ─────────────────────────────────── */
