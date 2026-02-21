@@ -1,6 +1,7 @@
 import { memo, useCallback } from 'react';
 import { NodeResizer } from 'reactflow';
 import useFlowStore from '../store/useFlowStore';
+import CustomColorPicker from './CustomColorPicker';
 
 /**
  * Liste de couleurs pastel proposées pour les sections.
@@ -77,7 +78,7 @@ const SectionNode = ({ id, data }) => {
         />
 
         {/* Sélecteur de couleur */}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-wrap">
           {PASTEL_COLORS.map((color) => (
             <button
               key={color}
@@ -87,6 +88,11 @@ const SectionNode = ({ id, data }) => {
               title={color}
             />
           ))}
+          <CustomColorPicker
+            value={data.color || '#e0e7ff'}
+            onChange={handleColorChange}
+            isActive={!PASTEL_COLORS.includes(data.color)}
+          />
         </div>
       </div>
     </div>

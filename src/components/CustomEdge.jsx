@@ -1,6 +1,7 @@
 import { memo, useState, useRef, useEffect } from 'react';
 import { getBezierPath, EdgeLabelRenderer } from 'reactflow';
 import useFlowStore from '../store/useFlowStore';
+import CustomColorPicker from './CustomColorPicker';
 
 const EDGE_COLORS = [
   '#6366f1', '#ef4444', '#10b981', '#0ea5e9',
@@ -167,6 +168,11 @@ const CustomEdge = ({
                     style={{ backgroundColor: color }}
                   />
                 ))}
+                <CustomColorPicker
+                  value={edgeColor}
+                  onChange={(color) => updateEdgeData(id, { color })}
+                  isActive={!EDGE_COLORS.includes(edgeColor)}
+                />
               </div>
             </div>
           )}

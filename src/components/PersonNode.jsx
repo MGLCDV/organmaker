@@ -1,6 +1,7 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import useFlowStore from '../store/useFlowStore';
+import CustomColorPicker from './CustomColorPicker';
 
 const PERSON_BG_COLORS = [
   '#ffffff', '#f1f5f9', '#e0e7ff', '#fce7f3',
@@ -107,7 +108,7 @@ const PersonNode = ({ id, data }) => {
           >
             <div>
               <span className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Fond</span>
-              <div className="flex gap-1 mt-1">
+              <div className="flex gap-1 mt-1 flex-wrap">
                 {PERSON_BG_COLORS.map((c) => (
                   <button
                     key={c}
@@ -116,11 +117,16 @@ const PersonNode = ({ id, data }) => {
                     style={{ backgroundColor: c }}
                   />
                 ))}
+                <CustomColorPicker
+                  value={bgColor}
+                  onChange={(color) => updateNodeData(id, { bgColor: color })}
+                  isActive={!PERSON_BG_COLORS.includes(bgColor)}
+                />
               </div>
             </div>
             <div>
               <span className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Bordure</span>
-              <div className="flex gap-1 mt-1">
+              <div className="flex gap-1 mt-1 flex-wrap">
                 {PERSON_BORDER_COLORS.map((c) => (
                   <button
                     key={c}
@@ -129,6 +135,11 @@ const PersonNode = ({ id, data }) => {
                     style={{ backgroundColor: c }}
                   />
                 ))}
+                <CustomColorPicker
+                  value={borderColor}
+                  onChange={(color) => updateNodeData(id, { borderColor: color })}
+                  isActive={!PERSON_BORDER_COLORS.includes(borderColor)}
+                />
               </div>
             </div>
           </div>
