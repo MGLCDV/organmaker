@@ -188,7 +188,7 @@ const Sidebar = () => {
         className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors"
       >
         {Icons.plus}
-        + Ajouter
+        Ajouter
       </button>
 
       {/* Preset list */}

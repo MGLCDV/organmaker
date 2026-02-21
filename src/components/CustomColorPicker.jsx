@@ -1,4 +1,5 @@
 import { useRef, useCallback, memo } from 'react';
+import { DEFAULT_EDGE_COLOR } from '../config';
 
 /**
  * Bouton rond arc-en-ciel avec un « + » blanc au centre.
@@ -10,7 +11,7 @@ import { useRef, useCallback, memo } from 'react';
  *  - isActive      : si true, affiche le style "sélectionné" (bordure sombre + scale)
  *  - size          : taille en rem du bouton (défaut 1rem = w-4 h-4)
  */
-const CustomColorPicker = ({ value = '#6366f1', onChange, isActive = false, size = 'w-4 h-4' }) => {
+const CustomColorPicker = ({ value = DEFAULT_EDGE_COLOR, onChange, isActive = false, size = 'w-4 h-4' }) => {
   const inputRef = useRef(null);
 
   const handleClick = useCallback((e) => {

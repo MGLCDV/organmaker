@@ -127,7 +127,7 @@ export default function useKeyboardShortcuts() {
         const needShift = !!shortcut.shift;
 
         if (
-          e.key === shortcut.key &&
+          e.key.toLowerCase() === shortcut.key.toLowerCase() &&
           ctrl === needCtrl &&
           e.shiftKey === needShift
         ) {

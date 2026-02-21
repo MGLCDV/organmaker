@@ -2,20 +2,12 @@ import { memo, useCallback } from 'react';
 import { NodeResizer } from 'reactflow';
 import useFlowStore from '../store/useFlowStore';
 import CustomColorPicker from './CustomColorPicker';
-
-/**
- * Liste de couleurs pastel proposées pour les sections.
- */
-const PASTEL_COLORS = [
-  '#e0e7ff', // indigo
-  '#fce7f3', // pink
-  '#d1fae5', // emerald
-  '#fef3c7', // amber
-  '#e0f2fe', // sky
-  '#f3e8ff', // violet
-  '#ffedd5', // orange
-  '#f1f5f9', // slate
-];
+import {
+  SECTION_COLORS,
+  DEFAULT_SECTION_COLOR,
+  SECTION_MIN_WIDTH,
+  SECTION_MIN_HEIGHT,
+} from '../config';
 
 /**
  * Bloc "Section" :
@@ -42,17 +34,17 @@ const SectionNode = ({ id, data }) => {
     <div
       className="section-node group rounded-2xl border-2 border-dashed border-gray-300 relative"
       style={{
-        backgroundColor: data.color || '#e0e7ff',
+        backgroundColor: data.color || DEFAULT_SECTION_COLOR,
         width: '100%',
         height: '100%',
-        minWidth: 200,
-        minHeight: 150,
+        minWidth: SECTION_MIN_WIDTH,
+        minHeight: SECTION_MIN_HEIGHT,
       }}
     >
       {/* Resizer */}
       <NodeResizer
-        minWidth={200}
-        minHeight={150}
+        minWidth={SECTION_MIN_WIDTH}
+        minHeight={SECTION_MIN_HEIGHT}
         lineClassName="!border-indigo-300"
         handleClassName="!w-3 !h-3 !bg-indigo-400 !border-2 !border-white !rounded-full"
       />
@@ -79,7 +71,7 @@ const SectionNode = ({ id, data }) => {
 
         {/* Sélecteur de couleur */}
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-wrap">
-          {PASTEL_COLORS.map((color) => (
+          {SECTION_COLORS.map((color) => (
             <button
               key={color}
               onClick={() => handleColorChange(color)}
@@ -89,9 +81,9 @@ const SectionNode = ({ id, data }) => {
             />
           ))}
           <CustomColorPicker
-            value={data.color || '#e0e7ff'}
+            value={data.color || DEFAULT_SECTION_COLOR}
             onChange={handleColorChange}
-            isActive={!PASTEL_COLORS.includes(data.color)}
+            isActive={!SECTION_COLORS.includes(data.color)}
           />
         </div>
       </div>

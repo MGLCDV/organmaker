@@ -7,12 +7,63 @@ import {
 } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
 import dagre from 'dagre';
-
-// ─── Constants ──────────────────────────────────────────
-const STORAGE_KEY = 'organmaker-flow';
+import {
+  STORAGE_KEY,
+  UNDO_LIMIT,
+  EDIT_COMMIT_DELAY,
+  SAVE_DEBOUNCE,
+  PERSON_NODE_WIDTH,
+  PERSON_NODE_HEIGHT,
+  SECTION_DEFAULT_WIDTH,
+  SECTION_DEFAULT_HEIGHT,
+  PERSON_Z_INDEX,
+  SECTION_Z_INDEX,
+  SECTION_SELECTED_Z_INDEX,
+  LAYOUT_RANK_SEP,
+  LAYOUT_NODE_SEP,
+  LAYOUT_MARGIN_X,
+  LAYOUT_MARGIN_Y,
+  SIDE_OFFSET_X,
+  SIDE_STACK_GAP_Y,
+  SIDE_START_Y,
+  PASTE_OFFSET,
+  DEFAULT_EDGE_COLOR,
+  DEFAULT_EDGE_STROKE_WIDTH,
+  DEFAULT_PERSON_BG,
+  DEFAULT_PERSON_BORDER,
+  DEFAULT_SECTION_COLOR,
+  DEFAULT_FILE_NAME,
+  DEFAULT_PERSON_NAME,
+  DEFAULT_PERSON_ROLE,
+  DEFAULT_SECTION_TITLE,
+} from '../config';
 
 // ─── Clipboard (module-level, not tracked by temporal) ──
 let _clipboard = { nodes: [], edges: [] };
+
+/** Migrate edges from old format (null handles) to explicit handle IDs */
+function _migrateEdges(edges) {
+  if (!Array.isArray(edges)) return edges;
+  return edges.map((e) => ({
+    ...e,
+    sourceHandle: e.sourceHandle || 'source-bottom',
+    targetHandle: e.targetHandle || 'target-top',
+  }));
+}
+
+/** Ensure all nodes have correct zIndex (sections behind, persons in front) */
+function _migrateNodeZIndex(nodes) {
+  if (!Array.isArray(nodes)) return nodes;
+  return nodes.map((n) => {
+    if (n.type === 'person' && n.zIndex !== PERSON_Z_INDEX) {
+      return { ...n, zIndex: PERSON_Z_INDEX };
+    }
+    if (n.type === 'section' && (n.zIndex == null || n.zIndex > SECTION_Z_INDEX)) {
+      return { ...n, zIndex: n.selected ? SECTION_SELECTED_Z_INDEX : SECTION_Z_INDEX };
+    }
+    return n;
+  });
+}
 
 // ─── Drag / edit snapshot (module-level) ────────────────
 let _preDragSnapshot = null;
@@ -38,7 +89,7 @@ function debounce(fn, ms) {
 
 const _saveLazy = debounce(() => {
   useFlowStore.getState()._save();
-}, 300);
+}, SAVE_DEBOUNCE);
 
 /**
  * Store Zustand + zundo temporal pour gérer l'état complet
@@ -50,14 +101,33 @@ const useFlowStore = create(
       // ─── State ──────────────────────────────────────────
       nodes: [],
       edges: [],
-      fileName: 'Mon Organigramme',
+      fileName: DEFAULT_FILE_NAME,
       fileVersion: 1,
       presets: [],
 
-      // ─── File name ─────────────────────────────────────
+      // ─── File name & version ─────────────────────────────
       setFileName: (fileName) => {
         set({ fileName });
         get()._save();
+      },
+
+      setFileVersion: (fileVersion) => {
+        const v = Math.max(1, Math.floor(fileVersion));
+        set({ fileVersion: v });
+        get()._save();
+      },
+
+      incrementVersion: () => {
+        set({ fileVersion: get().fileVersion + 1 });
+        get()._save();
+      },
+
+      decrementVersion: () => {
+        const v = get().fileVersion;
+        if (v > 1) {
+          set({ fileVersion: v - 1 });
+          get()._save();
+        }
       },
 
       // ─── React Flow callbacks ───────────────────────────
@@ -75,8 +145,8 @@ const useFlowStore = create(
 
         let updatedNodes = applyNodeChanges(changes, get().nodes);
         updatedNodes = updatedNodes.map((n) => {
-          if (n.type === 'section') return { ...n, zIndex: n.selected ? -5 : -10 };
-          if (n.type === 'person') return { ...n, zIndex: 10 };
+          if (n.type === 'section') return { ...n, zIndex: n.selected ? SECTION_SELECTED_Z_INDEX : SECTION_Z_INDEX };
+          if (n.type === 'person') return { ...n, zIndex: PERSON_Z_INDEX };
           return n;
         });
         set({ nodes: updatedNodes });
@@ -86,7 +156,7 @@ const useFlowStore = create(
           useFlowStore.temporal.getState().resume();
           const { pastStates } = useFlowStore.temporal.getState();
           useFlowStore.temporal.setState({
-            pastStates: [...pastStates.slice(-49), _preDragSnapshot],
+            pastStates: [...pastStates.slice(-(UNDO_LIMIT - 1)), _preDragSnapshot],
             futureStates: [],
           });
           _preDragSnapshot = null;
@@ -104,11 +174,13 @@ const useFlowStore = create(
       onConnect: (connection) => {
         const edge = {
           ...connection,
+          sourceHandle: connection.sourceHandle || 'source-bottom',
+          targetHandle: connection.targetHandle || 'target-top',
           id: uuidv4(),
           type: 'custom',
-          data: { color: '#6366f1', dashed: false },
-          markerEnd: { type: 'arrowclosed', color: '#6366f1' },
-          style: { stroke: '#6366f1', strokeWidth: 2 },
+          data: { color: DEFAULT_EDGE_COLOR, dashed: false },
+          markerEnd: { type: 'arrowclosed', color: DEFAULT_EDGE_COLOR },
+          style: { stroke: DEFAULT_EDGE_COLOR, strokeWidth: DEFAULT_EDGE_STROKE_WIDTH },
         };
         set({ edges: rfAddEdge(edge, get().edges) });
         get()._save();
@@ -121,15 +193,15 @@ const useFlowStore = create(
           id: uuidv4(),
           type: 'person',
           position,
-          zIndex: 10,
+          zIndex: PERSON_Z_INDEX,
           data: {
-            name: 'Nouveau',
-            role: 'Rôle',
+            name: DEFAULT_PERSON_NAME,
+            role: DEFAULT_PERSON_ROLE,
             comment: '',
             showComment: false,
             photo: null,
-            bgColor: '#ffffff',
-            borderColor: '#e5e7eb',
+            bgColor: DEFAULT_PERSON_BG,
+            borderColor: DEFAULT_PERSON_BORDER,
           },
         };
         set({ nodes: [...get().nodes, node] });
@@ -142,11 +214,11 @@ const useFlowStore = create(
           type: 'section',
           position,
           data: {
-            title: 'Nouvelle Section',
-            color: '#e0e7ff',
+            title: DEFAULT_SECTION_TITLE,
+            color: DEFAULT_SECTION_COLOR,
           },
-          style: { width: 500, height: 350 },
-          zIndex: -10,
+          style: { width: SECTION_DEFAULT_WIDTH, height: SECTION_DEFAULT_HEIGHT },
+          zIndex: SECTION_Z_INDEX,
         };
         set({ nodes: [...get().nodes, node] });
         get()._save();
@@ -175,20 +247,20 @@ const useFlowStore = create(
             n.id === nodeId ? { ...n, data: { ...n.data, ...newData } } : n
           ),
         });
-        // Commit after 600 ms of inactivity
+        // Commit after EDIT_COMMIT_DELAY ms of inactivity
         clearTimeout(_editTimer);
         _editTimer = setTimeout(() => {
           if (_editSnapshot) {
             useFlowStore.temporal.getState().resume();
             const { pastStates } = useFlowStore.temporal.getState();
             useFlowStore.temporal.setState({
-              pastStates: [...pastStates.slice(-49), _editSnapshot],
+              pastStates: [...pastStates.slice(-(UNDO_LIMIT - 1)), _editSnapshot],
               futureStates: [],
             });
             _editSnapshot = null;
           }
           useFlowStore.getState()._save();
-        }, 600);
+        }, EDIT_COMMIT_DELAY);
       },
 
       // ─── Edges ──────────────────────────────────────────
@@ -219,45 +291,156 @@ const useFlowStore = create(
         get()._save();
       },
 
-      // ─── Auto-layout (dagre, top-down tree) ────────────
+      // ─── Auto-layout (dagre + side stacks) ─────────────
       autoLayout: () => {
         const { nodes, edges } = get();
         if (nodes.length === 0) return;
 
-        const g = new dagre.graphlib.Graph();
-        g.setDefaultEdgeLabel(() => ({}));
-        g.setGraph({
-          rankdir: 'TB',
-          ranksep: 100,
-          nodesep: 60,
-          marginx: 40,
-          marginy: 40,
-        });
-
-        // Only auto-layout person nodes (sections are background containers)
         const personNodes = nodes.filter((n) => n.type === 'person');
         const sectionNodes = nodes.filter((n) => n.type === 'section');
         const personIds = new Set(personNodes.map((n) => n.id));
 
-        personNodes.forEach((n) => {
-          g.setNode(n.id, { width: 256, height: 200 });
+        // ── Séparer les edges hiérarchiques (haut) des edges latéraux ──
+        const treeEdges = [];
+        const sideEdges = [];
+        edges.forEach((e) => {
+          if (!personIds.has(e.source) || !personIds.has(e.target)) return;
+          const th = e.targetHandle || 'target-top';
+          if (th === 'target-left' || th === 'target-right') {
+            sideEdges.push(e);
+          } else {
+            treeEdges.push(e);
+          }
         });
 
-        edges.forEach((e) => {
-          if (personIds.has(e.source) && personIds.has(e.target)) {
-            g.setEdge(e.source, e.target);
+        const sideChildIds = new Set(sideEdges.map((e) => e.target));
+
+        // ── Dagre : uniquement les edges hiérarchiques ──
+        const g = new dagre.graphlib.Graph();
+        g.setDefaultEdgeLabel(() => ({}));
+        g.setGraph({
+          rankdir: 'TB',
+          ranksep: LAYOUT_RANK_SEP,
+          nodesep: LAYOUT_NODE_SEP,
+          marginx: LAYOUT_MARGIN_X,
+          marginy: LAYOUT_MARGIN_Y,
+        });
+
+        personNodes.forEach((n) => {
+          const hasTreeParent = treeEdges.some((e) => e.target === n.id);
+          if (sideChildIds.has(n.id) && !hasTreeParent) {
+            g.setNode(n.id, { width: 1, height: 1 });
+          } else {
+            g.setNode(n.id, { width: PERSON_NODE_WIDTH, height: PERSON_NODE_HEIGHT });
           }
+        });
+
+        treeEdges.forEach((e) => {
+          g.setEdge(e.source, e.target);
         });
 
         dagre.layout(g);
 
-        const laidOutPersons = personNodes.map((n) => {
+        // ── Positions initiales depuis dagre ──
+        const posMap = {};
+        personNodes.forEach((n) => {
           const pos = g.node(n.id);
-          return {
-            ...n,
-            position: { x: pos.x - 128, y: pos.y - 100 },
-          };
+          posMap[n.id] = { x: pos.x - PERSON_NODE_WIDTH / 2, y: pos.y - PERSON_NODE_HEIGHT / 2 };
         });
+
+        // ── Regrouper les enfants latéraux par parent ──
+        const sideChildrenByParent = {};
+        sideEdges.forEach((e) => {
+          if (!sideChildrenByParent[e.source]) {
+            sideChildrenByParent[e.source] = { left: [], right: [] };
+          }
+          const side = e.targetHandle === 'target-left' ? 'left' : 'right';
+          sideChildrenByParent[e.source][side].push(e.target);
+        });
+
+        // ── Construire la map de descendants tree pour décaler les sous-arbres ──
+        const treeChildrenMap = {};
+        treeEdges.forEach((e) => {
+          if (!treeChildrenMap[e.source]) treeChildrenMap[e.source] = [];
+          treeChildrenMap[e.source].push(e.target);
+        });
+
+        function getTreeDescendants(nodeId, visited = new Set()) {
+          if (visited.has(nodeId)) return [];
+          visited.add(nodeId);
+          const children = treeChildrenMap[nodeId] || [];
+          const result = [...children];
+          for (const child of children) {
+            result.push(...getTreeDescendants(child, visited));
+          }
+          return result;
+        }
+
+        // ── Repositionner un enfant latéral + décaler son sous-arbre ──
+        function repositionChild(childId, newPos) {
+          const oldPos = posMap[childId];
+          const dx = newPos.x - oldPos.x;
+          const dy = newPos.y - oldPos.y;
+          posMap[childId] = newPos;
+          const descendants = getTreeDescendants(childId);
+          descendants.forEach((descId) => {
+            posMap[descId] = {
+              x: posMap[descId].x + dx,
+              y: posMap[descId].y + dy,
+            };
+          });
+        }
+
+        // ── Traitement en ordre BFS (parents avant enfants) ──
+        const visited = new Set();
+        const roots = personNodes
+          .filter((n) => !edges.some((e) => e.target === n.id && personIds.has(e.source)))
+          .map((n) => n.id);
+        const queue = [...roots];
+        const processOrder = [];
+        while (queue.length) {
+          const nid = queue.shift();
+          if (visited.has(nid)) continue;
+          visited.add(nid);
+          processOrder.push(nid);
+          edges.forEach((e) => {
+            if (e.source === nid && personIds.has(e.target) && !visited.has(e.target)) {
+              queue.push(e.target);
+            }
+          });
+        }
+        // Ajouter les nœuds non visités (cycles, isolés)
+        personNodes.forEach((n) => {
+          if (!visited.has(n.id)) processOrder.push(n.id);
+        });
+
+        // ── Placer les enfants latéraux ──
+        processOrder.forEach((nid) => {
+          const sides = sideChildrenByParent[nid];
+          if (!sides) return;
+          const parentPos = posMap[nid];
+
+          // target-right → enfant à GAUCHE (flèche descend puis va à gauche vers le côté droit)
+          sides.right.forEach((childId, i) => {
+            repositionChild(childId, {
+              x: parentPos.x - SIDE_OFFSET_X,
+              y: parentPos.y + PERSON_NODE_HEIGHT + SIDE_START_Y + i * (PERSON_NODE_HEIGHT + SIDE_STACK_GAP_Y),
+            });
+          });
+
+          // target-left → enfant à DROITE (flèche descend puis va à droite vers le côté gauche)
+          sides.left.forEach((childId, i) => {
+            repositionChild(childId, {
+              x: parentPos.x + SIDE_OFFSET_X,
+              y: parentPos.y + PERSON_NODE_HEIGHT + SIDE_START_Y + i * (PERSON_NODE_HEIGHT + SIDE_STACK_GAP_Y),
+            });
+          });
+        });
+
+        const laidOutPersons = personNodes.map((n) => ({
+          ...n,
+          position: posMap[n.id],
+        }));
 
         set({ nodes: [...sectionNodes, ...laidOutPersons] });
         get()._save();
@@ -284,7 +467,7 @@ const useFlowStore = create(
         if (_clipboard.nodes.length === 0) return;
 
         const idMap = {};
-        const offset = 60;
+        const offset = PASTE_OFFSET;
 
         const multi = _clipboard.nodes.length > 1;
 
@@ -442,9 +625,9 @@ const useFlowStore = create(
             const { nodes, edges, fileName, fileVersion, presets } =
               JSON.parse(raw);
             set({
-              nodes: nodes || [],
-              edges: edges || [],
-              fileName: fileName || 'Mon Organigramme',
+              nodes: _migrateNodeZIndex(nodes || []),
+              edges: _migrateEdges(edges || []),
+              fileName: fileName || DEFAULT_FILE_NAME,
               fileVersion: fileVersion || 1,
               presets: presets || [],
             });
@@ -489,8 +672,6 @@ const useFlowStore = create(
         a.download = `${safeName || 'organigramme'}_v${fileVersion}_${date}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        set({ fileVersion: fileVersion + 1 });
-        get()._save();
       },
 
       importFlow: () => {
@@ -518,9 +699,9 @@ const useFlowStore = create(
                 return;
               const meta = data.meta || {};
               set({
-                nodes,
-                edges,
-                fileName: meta.fileName || 'Mon Organigramme',
+                nodes: _migrateNodeZIndex(nodes),
+                edges: _migrateEdges(edges),
+                fileName: meta.fileName || DEFAULT_FILE_NAME,
                 fileVersion: parseInt(meta.version, 10) || 1,
                 presets: data.presets || [],
               });
@@ -538,7 +719,7 @@ const useFlowStore = create(
         set({
           nodes: [],
           edges: [],
-          fileName: 'Mon Organigramme',
+          fileName: DEFAULT_FILE_NAME,
           fileVersion: 1,
           presets: [],
         });
@@ -553,7 +734,7 @@ const useFlowStore = create(
       partialize: (state) => _partialize(state),
       equality: (pastState, currentState) =>
         JSON.stringify(pastState) === JSON.stringify(currentState),
-      limit: 50,
+      limit: UNDO_LIMIT,
     }
   )
 );

@@ -16,6 +16,21 @@ import Sidebar from './components/Sidebar';
 import ShortcutsHelp from './components/ShortcutsHelp';
 import useFlowStore from './store/useFlowStore';
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts';
+import {
+  GRID_SIZE,
+  GRID_VARIANT,
+  GRID_DOT_SIZE,
+  GRID_DOT_COLOR,
+  EXPORT_BG_COLOR,
+  EXPORT_PIXEL_RATIO,
+  DEFAULT_EDGE_COLOR,
+  DEFAULT_EDGE_STROKE_WIDTH,
+  DEFAULT_SECTION_COLOR,
+  DEFAULT_PERSON_BG,
+  DEFAULT_PERSON_BORDER,
+  MINIMAP_PERSON_COLOR,
+  MINIMAP_MASK_COLOR,
+} from './config';
 
 // ─── Types de nodes et edges personnalisés ──────────────
 const nodeTypes = { person: PersonNode, section: SectionNode };
@@ -34,7 +49,7 @@ function captureViewport() {
     wrapper?.classList.add('exporting');
 
     requestAnimationFrame(() => {
-      toPng(el, { backgroundColor: '#f8fafc', pixelRatio: 2 })
+      toPng(el, { backgroundColor: EXPORT_BG_COLOR, pixelRatio: EXPORT_PIXEL_RATIO })
         .then((dataUrl) => {
           wrapper?.classList.remove('exporting');
           resolve(dataUrl);
@@ -80,6 +95,8 @@ function Flow() {
   const fileName = useFlowStore((s) => s.fileName);
   const fileVersion = useFlowStore((s) => s.fileVersion);
   const setFileName = useFlowStore((s) => s.setFileName);
+  const incrementVersion = useFlowStore((s) => s.incrementVersion);
+  const decrementVersion = useFlowStore((s) => s.decrementVersion);
   const autoLayout = useFlowStore((s) => s.autoLayout);
 
   // ── Undo / Redo state ──────────────────────────────
@@ -175,6 +192,27 @@ function Flow() {
             placeholder="Nom du fichier"
           />
           <span className="text-xs text-gray-400 font-mono shrink-0">v{fileVersion}</span>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={decrementVersion}
+              disabled={fileVersion <= 1}
+              className="w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Version précédente"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 12h-15" />
+              </svg>
+            </button>
+            <button
+              onClick={incrementVersion}
+              className="w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              title="Version suivante"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Right: actions */}
@@ -305,14 +343,14 @@ function Flow() {
           edgeTypes={edgeTypes}
           fitView
           snapToGrid
-          snapGrid={[16, 16]}
+          snapGrid={GRID_SIZE}
           defaultEdgeOptions={{
             type: 'custom',
-            data: { color: '#6366f1', dashed: false },
-            markerEnd: { type: 'arrowclosed', color: '#6366f1' },
-            style: { stroke: '#6366f1', strokeWidth: 2 },
+            data: { color: DEFAULT_EDGE_COLOR, dashed: false },
+            markerEnd: { type: 'arrowclosed', color: DEFAULT_EDGE_COLOR },
+            style: { stroke: DEFAULT_EDGE_COLOR, strokeWidth: DEFAULT_EDGE_STROKE_WIDTH },
           }}
-          connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
+          connectionLineStyle={{ stroke: DEFAULT_EDGE_COLOR, strokeWidth: DEFAULT_EDGE_STROKE_WIDTH }}
           connectionLineType="bezier"
           deleteKeyCode={['Backspace', 'Delete']}
           elevateNodesOnSelect={false}
@@ -320,7 +358,7 @@ function Flow() {
           selectionMode="partial"
           multiSelectionKeyCode="Shift"
         >
-          <Background variant="dots" gap={16} size={1} color="#cbd5e1" />
+          <Background variant={GRID_VARIANT} gap={GRID_SIZE[0]} size={GRID_DOT_SIZE} color={GRID_DOT_COLOR} />
           <Controls
             className="!bg-white !border !border-gray-200 !rounded-xl !shadow-md"
             showInteractive={false}
@@ -328,13 +366,24 @@ function Flow() {
           />
           <MiniMap
             nodeColor={(node) => {
-              if (node.type === 'section') return node.data?.color || '#e0e7ff';
-              return '#6366f1';
+              if (node.type === 'section') return node.data?.color || DEFAULT_SECTION_COLOR;
+              // Person: use border color for visibility (white bg is invisible on minimap)
+              const bg = node.data?.bgColor || DEFAULT_PERSON_BG;
+              if (bg === '#ffffff' || bg === '#fff' || bg.toLowerCase() === DEFAULT_PERSON_BG.toLowerCase()) {
+                return node.data?.borderColor || MINIMAP_PERSON_COLOR;
+              }
+              return bg;
             }}
-            maskColor="rgba(248, 250, 252, 0.7)"
+            nodeStrokeColor={(node) => {
+              if (node.type === 'person') return node.data?.borderColor || DEFAULT_PERSON_BORDER;
+              return 'transparent';
+            }}
+            nodeStrokeWidth={2}
+            maskColor={MINIMAP_MASK_COLOR}
             className="!bg-white !border !border-gray-200 !rounded-xl !shadow-md"
             pannable
             zoomable
+            style={{ zIndex: 5 }}
           />
         </ReactFlow>
       </div>

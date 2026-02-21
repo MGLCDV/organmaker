@@ -2,11 +2,11 @@ import { memo, useState, useRef, useEffect } from 'react';
 import { getBezierPath, EdgeLabelRenderer } from 'reactflow';
 import useFlowStore from '../store/useFlowStore';
 import CustomColorPicker from './CustomColorPicker';
-
-const EDGE_COLORS = [
-  '#6366f1', '#ef4444', '#10b981', '#0ea5e9',
-  '#f59e0b', '#8b5cf6', '#6b7280', '#ec4899',
-];
+import {
+  EDGE_COLORS,
+  DEFAULT_EDGE_COLOR,
+  EDGE_CURVATURE,
+} from '../config';
 
 /**
  * Edge personnalisée :
@@ -31,7 +31,7 @@ const CustomEdge = ({
   const [isHovered, setIsHovered] = useState(false);
   const controlsRef = useRef(null);
 
-  const edgeColor = data.color || style.stroke || '#6366f1';
+  const edgeColor = data.color || style.stroke || DEFAULT_EDGE_COLOR;
   const isDashed = data.dashed ?? false;
   const showControls = isHovered || menuOpen;
 
@@ -42,7 +42,7 @@ const CustomEdge = ({
     targetY,
     sourcePosition,
     targetPosition,
-    curvature: 0.25,
+    curvature: EDGE_CURVATURE,
   });
 
   // Fermer le menu au clic extérieur

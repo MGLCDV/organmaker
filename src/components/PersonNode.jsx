@@ -2,16 +2,14 @@ import { memo, useCallback, useRef, useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import useFlowStore from '../store/useFlowStore';
 import CustomColorPicker from './CustomColorPicker';
-
-const PERSON_BG_COLORS = [
-  '#ffffff', '#f1f5f9', '#e0e7ff', '#fce7f3',
-  '#d1fae5', '#fef3c7', '#e0f2fe', '#f3e8ff',
-];
-
-const PERSON_BORDER_COLORS = [
-  '#e5e7eb', '#6366f1', '#ec4899', '#10b981',
-  '#f59e0b', '#0ea5e9', '#8b5cf6', '#ef4444',
-];
+import compressImage from '../utils/compressImage';
+import {
+  PERSON_BG_COLORS,
+  PERSON_BORDER_COLORS,
+  DEFAULT_PERSON_BG,
+  DEFAULT_PERSON_BORDER,
+  PERSON_PHOTO_FALLBACK_BG,
+} from '../config';
 
 /**
  * Bloc "Personne" :
@@ -26,8 +24,8 @@ const PersonNode = ({ id, data }) => {
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const colorPickerRef = useRef(null);
 
-  const bgColor = data.bgColor || '#ffffff';
-  const borderColor = data.borderColor || '#e5e7eb';
+  const bgColor = data.bgColor || DEFAULT_PERSON_BG;
+  const borderColor = data.borderColor || DEFAULT_PERSON_BORDER;
 
   // ── Fermer le color picker au clic extérieur ──────
   useEffect(() => {
@@ -41,16 +39,22 @@ const PersonNode = ({ id, data }) => {
     return () => document.removeEventListener('mousedown', handler, true);
   }, [colorPickerOpen]);
 
-  // ── Upload photo ──────────────────────────────────
+  // ── Upload photo (compressée) ────────────────────────────
   const handlePhotoUpload = useCallback(
-    (e) => {
+    async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        updateNodeData(id, { photo: ev.target.result });
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImage(file);
+        updateNodeData(id, { photo: compressed });
+      } catch {
+        // Fallback: lecture directe si la compression échoue
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          updateNodeData(id, { photo: ev.target.result });
+        };
+        reader.readAsDataURL(file);
+      }
     },
     [id, updateNodeData]
   );
@@ -73,9 +77,26 @@ const PersonNode = ({ id, data }) => {
     >
       {/* Handle cible (haut) */}
       <Handle
+        id="target-top"
         type="target"
         position={Position.Top}
         className="!w-3 !h-3 !bg-indigo-400 !border-2 !border-white"
+      />
+
+      {/* Handle cible (gauche) */}
+      <Handle
+        id="target-left"
+        type="target"
+        position={Position.Left}
+        className="side-handle !w-2.5 !h-2.5 !bg-indigo-300 !border-2 !border-white"
+      />
+
+      {/* Handle cible (droite) */}
+      <Handle
+        id="target-right"
+        type="target"
+        position={Position.Right}
+        className="side-handle !w-2.5 !h-2.5 !bg-indigo-300 !border-2 !border-white"
       />
 
       {/* Bouton supprimer */}
@@ -150,7 +171,7 @@ const PersonNode = ({ id, data }) => {
       <div className="flex justify-center pt-5">
         <div
           className="w-24 h-24 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center transition-colors"
-          style={{ borderColor, backgroundColor: bgColor === '#ffffff' ? '#eef2ff' : bgColor }}
+          style={{ borderColor, backgroundColor: bgColor === DEFAULT_PERSON_BG ? PERSON_PHOTO_FALLBACK_BG : bgColor }}
           onClick={() => fileInputRef.current?.click()}
           title="Cliquer pour changer la photo"
         >
@@ -226,6 +247,7 @@ const PersonNode = ({ id, data }) => {
 
       {/* Handle source (bas) */}
       <Handle
+        id="source-bottom"
         type="source"
         position={Position.Bottom}
         className="!w-3 !h-3 !bg-indigo-400 !border-2 !border-white"
