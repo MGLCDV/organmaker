@@ -4,9 +4,11 @@ import ReactFlow, {
   Controls,
   Background,
   ReactFlowProvider,
+  getNodesBounds,
+  getViewportForBounds,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { toPng } from 'html-to-image';
+import { toPng, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
 import PersonNode from './components/PersonNode';
@@ -23,6 +25,10 @@ import {
   GRID_DOT_COLOR,
   EXPORT_BG_COLOR,
   EXPORT_PIXEL_RATIO,
+  EXPORT_PDF_PIXEL_RATIO,
+  EXPORT_PADDING,
+  EXPORT_MAX_CANVAS_SIDE,
+  EXPORT_MAX_CANVAS_PIXELS,
   DEFAULT_EDGE_COLOR,
   DEFAULT_EDGE_STROKE_WIDTH,
   DEFAULT_SECTION_COLOR,
@@ -37,27 +43,117 @@ const nodeTypes = { person: PersonNode, section: SectionNode };
 const edgeTypes = { custom: CustomEdge };
 
 /**
- * Helper: capture le viewport React Flow en PNG data URL.
- * Ajoute puis retire la classe "exporting" pour masquer les boutons.
+ * Calcule le pixel ratio maximal possible sans dépasser les limites du canvas.
+ * Protects against browser crashes from oversized canvases.
  */
-function captureViewport() {
+function clampPixelRatio(width, height, wantedRatio) {
+  let r = wantedRatio;
+  // Ne pas dépasser la taille max par côté
+  while (r > 1 && (width * r > EXPORT_MAX_CANVAS_SIDE || height * r > EXPORT_MAX_CANVAS_SIDE)) {
+    r -= 0.5;
+  }
+  // Ne pas dépasser le budget total de pixels
+  while (r > 1 && width * r * height * r > EXPORT_MAX_CANVAS_PIXELS) {
+    r -= 0.5;
+  }
+  return Math.max(1, r);
+}
+
+/**
+ * Capture l'intégralité du graphe en pleine résolution, indépendamment du zoom.
+ * • Calcule le bounding-box de tous les nœuds
+ * • Applique un viewport 1:1 temporairement
+ * • Plafonne le pixel ratio pour éviter les crashs navigateur
+ * • Capture puis restaure l'état précédent
+ *
+ * @param {Array} nodes — tableau de nœuds React Flow
+ * @param {object} opts
+ * @param {number} [opts.pixelRatio=EXPORT_PIXEL_RATIO] — ratio souhaité
+ * @param {'png'|'jpeg'} [opts.format='png'] — format de sortie
+ * @param {number} [opts.quality=0.85] — qualité JPEG (0–1)
+ * @returns {Promise<string>} data URL
+ */
+function captureFullGraph(nodes, opts = {}) {
+  const {
+    pixelRatio: wantedRatio = EXPORT_PIXEL_RATIO,
+    format = 'png',
+    quality = 0.85,
+  } = opts;
+
   return new Promise((resolve, reject) => {
-    const el = document.querySelector('.react-flow__viewport');
-    if (!el) return reject(new Error('Viewport not found'));
+    const viewportEl = document.querySelector('.react-flow__viewport');
+    if (!viewportEl) return reject(new Error('Viewport not found'));
 
     const wrapper = document.querySelector('.react-flow');
     wrapper?.classList.add('exporting');
 
+    // Bounding-box de tous les nœuds
+    const bounds = getNodesBounds(nodes);
+    const padding = EXPORT_PADDING;
+    const imageWidth = Math.ceil(bounds.width + padding * 2);
+    const imageHeight = Math.ceil(bounds.height + padding * 2);
+
+    // Pixel ratio adapté à la taille réelle
+    const pixelRatio = clampPixelRatio(imageWidth, imageHeight, wantedRatio);
+
+    // Viewport 1:1 pour cadrer tout le graphe
+    const viewport = getViewportForBounds(
+      bounds,
+      imageWidth,
+      imageHeight,
+      0.5,
+      2,
+      padding
+    );
+
+    // Sauvegarder le transform actuel
+    const prev = viewportEl.style.transform;
+    viewportEl.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`;
+
+    const captureOpts = {
+      backgroundColor: EXPORT_BG_COLOR,
+      pixelRatio,
+      width: imageWidth,
+      height: imageHeight,
+      style: {
+        width: `${imageWidth}px`,
+        height: `${imageHeight}px`,
+      },
+      // Exclure minimap, controls, attribution du rendu
+      filter: (node) => {
+        if (!(node instanceof HTMLElement)) return true;
+        const cls = node.className || '';
+        if (typeof cls === 'string') {
+          if (cls.includes('react-flow__minimap')) return false;
+          if (cls.includes('react-flow__controls')) return false;
+          if (cls.includes('react-flow__attribution')) return false;
+        }
+        return true;
+      },
+    };
+
+    // JPEG : ajouter la qualité
+    if (format === 'jpeg') {
+      captureOpts.quality = quality;
+    }
+
+    const captureFn = format === 'jpeg' ? toJpeg : toPng;
+
+    // Double rAF pour laisser le DOM se stabiliser
     requestAnimationFrame(() => {
-      toPng(el, { backgroundColor: EXPORT_BG_COLOR, pixelRatio: EXPORT_PIXEL_RATIO })
-        .then((dataUrl) => {
-          wrapper?.classList.remove('exporting');
-          resolve(dataUrl);
-        })
-        .catch((err) => {
-          wrapper?.classList.remove('exporting');
-          reject(err);
-        });
+      requestAnimationFrame(() => {
+        captureFn(viewportEl, captureOpts)
+          .then((dataUrl) => {
+            viewportEl.style.transform = prev;
+            wrapper?.classList.remove('exporting');
+            resolve(dataUrl);
+          })
+          .catch((err) => {
+            viewportEl.style.transform = prev;
+            wrapper?.classList.remove('exporting');
+            reject(err);
+          });
+      });
     });
   });
 }
@@ -131,7 +227,9 @@ function Flow() {
 
   // ── Export PNG ─────────────────────────────────────
   const handleExportPng = useCallback(() => {
-    captureViewport().then((dataUrl) => {
+    const currentNodes = useFlowStore.getState().nodes;
+    if (currentNodes.length === 0) return;
+    captureFullGraph(currentNodes, EXPORT_PIXEL_RATIO).then((dataUrl) => {
       const a = document.createElement('a');
       a.href = dataUrl;
       a.download = `${fileStem()}.png`;
@@ -139,9 +237,11 @@ function Flow() {
     });
   }, []);
 
-  // ── Export PDF ─────────────────────────────────────
+  // ── Export PDF (haute résolution) ──────────────────
   const handleExportPdf = useCallback(() => {
-    captureViewport().then((dataUrl) => {
+    const currentNodes = useFlowStore.getState().nodes;
+    if (currentNodes.length === 0) return;
+    captureFullGraph(currentNodes, EXPORT_PDF_PIXEL_RATIO).then((dataUrl) => {
       const img = new Image();
       img.onload = () => {
         const ratio = img.width / img.height;
@@ -152,13 +252,15 @@ function Flow() {
         });
         const pw = pdf.internal.pageSize.getWidth();
         const ph = pdf.internal.pageSize.getHeight();
+        // Marge de 10mm de chaque côté
         let w = pw - 20;
         let h = w / ratio;
         if (h > ph - 20) {
           h = ph - 20;
           w = h * ratio;
         }
-        pdf.addImage(dataUrl, 'PNG', (pw - w) / 2, (ph - h) / 2, w, h);
+        // Image haute résolution → texte net même dézoomé
+        pdf.addImage(dataUrl, 'PNG', (pw - w) / 2, (ph - h) / 2, w, h, undefined, 'FAST');
         pdf.save(`${fileStem()}.pdf`);
       };
       img.src = dataUrl;

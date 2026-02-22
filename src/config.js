@@ -24,11 +24,23 @@ export const GRID_DOT_COLOR = '#cbd5e1';
 
 // ─── Export (PNG / PDF) ─────────────────────────────────────
 
-/** Couleur d'arrière-plan lors de l'export PNG */
+/** Couleur d'arrière-plan lors de l'export PNG / PDF */
 export const EXPORT_BG_COLOR = '#f8fafc';
 
-/** Ratio de pixels pour l'export PNG (2 = qualité retina) */
+/** Ratio de pixels souhaité pour l'export PNG (sera réduit si le canvas est trop grand) */
 export const EXPORT_PIXEL_RATIO = 2;
+
+/** Ratio de pixels souhaité pour l'export PDF (2 = net sur écran, fichier léger) */
+export const EXPORT_PDF_PIXEL_RATIO = 2;
+
+/** Marge autour du contenu lors de l'export pleine résolution (px) */
+export const EXPORT_PADDING = 40;
+
+/** Taille max d'un côté du canvas d'export (px). Au-delà, le navigateur crash. */
+export const EXPORT_MAX_CANVAS_SIDE = 8192;
+
+/** Nombre max de pixels total pour le canvas d'export (largeur × hauteur × ratio²) */
+export const EXPORT_MAX_CANVAS_PIXELS = 40_000_000;
 
 
 // ─── Stockage local ─────────────────────────────────────────
